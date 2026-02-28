@@ -14,7 +14,8 @@ async function start() {
                 const mainBody = document.querySelector("body > woms-root > div > div > main > woms-technical-eval");
                 const claimedTab = document.querySelector("[attr-e2e='claimed']");
                 const refineBtn = document.querySelector("[attr-e2e$='_refine']");
-                const username = document.querySelector("[attr-e2e='user_menu_user'] strong").textContent.trim();
+                const username = document.querySelector("[attr-e2e='user_menu_user'] strong")?.textContent.trim();
+                const email = document.querySelector('[attr-e2e="user_menu_user"] .user-data span')?.textContent.trim();
 
                 const REFRESH = 100;
                 const TIMEOUT = 10000;
@@ -58,6 +59,20 @@ async function start() {
                     });
                 };
 
+                async function iterateAssignedTo() {
+                    const assignedToMenu = await waitForElement(document, "[attr-e2e='assigned_to_options']");
+                    const assignedToMenuItems = assignedToMenu.querySelectorAll("li");
+
+                    for (const item of assignedToMenuItems) {
+                        const title = item.getAttribute("title") || item.textContent.trim();
+
+                        if (title.toLowerCase().includes(email.toLowerCase())) {
+                            item.click();
+                            break;
+                        }
+                    }
+                };
+
                 async function isJobs(mainBody) {
                     const jobsTable = await waitForElement(mainBody, "section > woms-table > div > div.woms-table-grid.dsc-table-grid > ag-grid-angular > div > div.ag-root-wrapper-body.ag-layout-auto-height.ag-focus-managed > div.ag-root.ag-unselectable.ag-layout-auto-height");
                     if (jobsTable) {
@@ -75,6 +90,7 @@ async function start() {
                     }
 
                     await iterateTaskStatusMenu();
+                    await iterateAssignedTo();
 
                     const columnsReset = await waitForElement(mainBody, `section > woms-table > div > dsc-pagination > div > div.dsc-pagination-section.--right > i`);
                     columnsReset.click();
@@ -139,6 +155,7 @@ async function start() {
                 try {
                     claimedTab.click();
                     await iterateTaskStatusMenu();
+                    await iterateAssignedTo();
                     refineBtn.click();
 
                     while (await isJobs(mainBody)) {
