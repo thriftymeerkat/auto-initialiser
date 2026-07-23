@@ -4,7 +4,7 @@
     "icons": {
         "128": "icon128.png"
     },
-    "version": "4.4",
+    "version": "4.7",
     "description": "A Chrome extension that automatically initiates AQC sessions in Duplo.",
     "background": {
         "service_worker": "background.js"

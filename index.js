@@ -5,6 +5,7 @@ startBtn.addEventListener("click", start);
 stopBtn.addEventListener("click", stop);
 
 async function start() {
+    // Reset the stop flag before starting, then query the active tab
     chrome.runtime.sendMessage({ resetStop: true }, async () => {
         let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         chrome.scripting.executeScript({
@@ -18,14 +19,14 @@ async function start() {
                 const email = document.querySelector('[attr-e2e="user_menu_user"] .user-data span')?.textContent.trim();
 
                 const REFRESH = 100;
-                const TIMEOUT = 10000;
+                const TIMEOUT = 300000;
 
-                // Helper functions
-                const waitForElement = (parent, child) => {
+                // Polls the DOM until a child element appears inside a parent, or times out
+                const waitForElement = (parent, child, validate = null) => {
                     return new Promise((resolve, reject) => {
                         const interval = setInterval(() => {
                             const element = parent.querySelector(child);
-                            if (element) {
+                            if (element && (!validate || validate(element))) {
                                 clearInterval(interval);
                                 resolve(element);
                             }
@@ -36,7 +37,8 @@ async function start() {
                         }, TIMEOUT);
                     });
                 };
-
+                                
+                // Checks with the background script whether the stop button has been clicked
                 const isStopBtnClicked = async () => {
                     return new Promise((resolve) => {
                         chrome.runtime.sendMessage({ checkStop: true }, (response) => {
@@ -45,6 +47,7 @@ async function start() {
                     });
                 };
 
+                // Opens the task status dropdown and ensures only "Ready" is selected
                 async function iterateTaskStatusMenu() {
                     const taskStatusMenu = await waitForElement(document, "[attr-e2e='task_status_options']");
                     const taskStatusMenuItems = taskStatusMenu.querySelectorAll("li");
@@ -53,12 +56,14 @@ async function start() {
                         const title = item.getAttribute("title") || item.textContent.trim();
                         const selected = item.classList.contains("--selected");
 
+                        // Click the item if its selection state doesn't match whether it's "Ready"
                         if (selected !== (title === "Ready")) {
                             item.click();
                         }
                     });
                 };
 
+                // Opens the "Assigned To" dropdown and selects the item matching the current user's email
                 async function iterateAssignedTo() {
                     const assignedToMenu = await waitForElement(document, "[attr-e2e='assigned_to_options']");
                     const assignedToMenuItems = assignedToMenu.querySelectorAll("li");
@@ -73,6 +78,7 @@ async function start() {
                     }
                 };
 
+                // Returns true if the jobs table is present and loaded in the main body
                 async function isJobs(mainBody) {
                     const jobsTable = await waitForElement(mainBody, "section > woms-table > div > div.woms-table-grid.dsc-table-grid > ag-grid-angular > div > div.ag-root-wrapper-body.ag-layout-auto-height.ag-focus-managed > div.ag-root.ag-unselectable.ag-layout-auto-height");
                     if (jobsTable) {
@@ -81,62 +87,60 @@ async function start() {
                     return false;
                 };
 
+                // Processes the first job row: validates its status and assignee, then clicks through to initiate an AQC session
                 async function initialiseJobs(mainBody, claimedTab, username) {
-                    let taskStatus, assignee;
-                    
+                    // Bail out early if the "Claimed" tab is no longer selected
                     if (!claimedTab.classList.contains("--selected")) {
                         console.error("Auto Initialiser Error: Claimed tab deselected");
                         return false;
                     }
 
+                    // Apply filters before reading job data
                     await iterateTaskStatusMenu();
                     await iterateAssignedTo();
 
+                    // Reset column layout via the pagination reset icon
                     const columnsReset = await waitForElement(mainBody, `section > woms-table > div > dsc-pagination > div > div.dsc-pagination-section.--right > i`);
                     columnsReset.click();
 
                     const rowBaseSelector = "section > woms-table > div > div.woms-table-grid.dsc-table-grid > ag-grid-angular > div > div.ag-root-wrapper-body.ag-layout-auto-height.ag-focus-managed > div.ag-root.ag-unselectable.ag-layout-auto-height > div.ag-body-viewport.ag-selectable.ag-layout-auto-height.ag-row-no-animation";
 
-                    let row;
+                    // Wait for the first row to appear in the grid
                     try {
-                        row = await waitForElement(mainBody, `${rowBaseSelector} > div.ag-center-cols-clipper > div > div > div`);
+                        await waitForElement(mainBody, `${rowBaseSelector} > div.ag-center-cols-clipper > div > div > div`);
                     } catch (error) {
                         console.error("Auto Initialiser Error: Job list not found");
                         return false;
                     }
 
-                    const columns = ["taskStatus", "assignee"];
-                    await Promise.all(
-                        columns.map(colId => waitForElement(row, `[col-id="${colId}"]:not(:empty)`))
-                    );
+                    // Wait for the status and assignee columns to be populated before reading them
+                    const rowCellSelector = `${rowBaseSelector} > div.ag-center-cols-clipper > div > div > div > [col-id`;
 
-                    [...row.children].forEach(column => {
-                        const colId = column.getAttribute("col-id");
-                        const text = column.textContent.trim();
+                    const [taskStatusEl, assigneeEl] = await Promise.all([
+                        waitForElement(mainBody, `${rowCellSelector}="taskStatus"]`, el => el.textContent.trim().length > 0),
+                        waitForElement(mainBody, `${rowCellSelector}="assignee"]`, el => el.textContent.trim().length > 0)
+                    ]);
 
-                        switch (colId) {
-                            case "taskStatus":
-                                taskStatus = text;
-                                break;
-                            case "assignee":
-                                assignee = text;
-                                break;
-                        }
-                    });
+                    const taskStatus = taskStatusEl.textContent.trim();
+                    const assignee = assigneeEl.textContent.trim();
 
+                    // Validate that the job is in the expected "Ready" state
                     if (taskStatus !== "Ready") {
                         console.error(`Auto Initialiser Error: status mismatch\nAccepted status: Ready\nStatus found: ${taskStatus}`);
                         return false;
                     }
 
+                    // Validate that the job is assigned to the current user
                     if (assignee !== username) {
                         console.error(`Auto Initialiser Error: user mismatch\nAccepted user: ${username}\nAssigned: ${assignee}`);
                         return false;
                     }
 
+                    // Open the action menu for the first row
                     const actionButton = await waitForElement(mainBody, `${rowBaseSelector} > div.ag-pinned-right-cols-container > div > div > div > span > woms-action-menu-cell > div > dsc-action-menu > div > div > i`);
                     actionButton.click();
 
+                    // Find and click the "Initiate AQC Session" option in the dropdown menu
                     const actionsMenu = await waitForElement(document, "body > div > div > ul");
                     const initiateBtn = [...actionsMenu.querySelectorAll("li > span")]
                         .find(span => span.textContent.trim() === "Initiate AQC Session");
@@ -151,20 +155,23 @@ async function start() {
                     return true;
                 };
 
-                // Main script
+                // Main script — sets up filters and loops through jobs until none remain or the user stops it
                 try {
                     claimedTab.click();
                     await iterateTaskStatusMenu();
                     await iterateAssignedTo();
-                    refineBtn.click();
+                    refineBtn.click(); 
 
+                    // Keep processing jobs as long as there are rows in the table
                     while (await isJobs(mainBody)) {
                         const shouldContinue = await initialiseJobs(mainBody, claimedTab, username);
 
+                        // Stop if initialiseJobs encountered an error or validation failure
                         if (!shouldContinue) {
                             break;
                         }
 
+                        // Stop if the user clicked the stop button
                         if (await isStopBtnClicked()) {
                             console.log("Initiate AQC Sessions stopped by user");
                             break;
@@ -178,6 +185,7 @@ async function start() {
     });
 };
 
+// Sends a stop request to the background script via the content script
 function stop() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const tab = tabs[0];
