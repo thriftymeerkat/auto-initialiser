@@ -58,33 +58,33 @@ body {
     gap: 0.5rem;
 }
 
-#auto-start-btn {
+[data-autoBtn="auto-start-btn"] {
     border: .0625rem solid var(--blue);
     background-color: var(--blue);
     color: var(--white);
 }
 
-#auto-start-btn:hover {
+[data-autoBtn="auto-start-btn"]:hover {
     border-color: var(--blueHvr);
     background-color: var(--blueHvr);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-#auto-start-btn:active {
+[data-autoBtn="auto-start-btn"]:active {
     border-color: var(--blueClck);
     background-color: var(--blueClck);
 }
 
-#auto-stop-btn {
+[data-autoBtn="auto-stop-btn"] {
     border: none;
     background-color: transparent;
     color: var(--blue);
 }
 
-#auto-stop-btn:hover {
+[data-autoBtn="auto-stop-btn"]:hover {
     color: var(--blueHvr);
 }
 
-#auto-stop-btn:active {
+[data-autoBtn="auto-stop-btn"]:active {
     color: var(--blueClck);
 }

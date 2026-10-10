@@ -1,5 +1,5 @@
-const startBtn = document.getElementById("auto-start-btn");
-const stopBtn = document.getElementById("auto-stop-btn");
+const startBtn = document.querySelector('[data-autoBtn="auto-start-btn"]');
+const stopBtn = document.querySelector('[data-autoBtn="auto-stop-btn"]');
 
 startBtn.addEventListener("click", start);
 stopBtn.addEventListener("click", stop);
@@ -15,8 +15,7 @@ async function start() {
                 const mainBody = document.querySelector("body > woms-root > div > div > main > woms-technical-eval");
                 const claimedTab = document.querySelector("[attr-e2e='claimed']");
                 const refineBtn = document.querySelector("[attr-e2e$='_refine']");
-                const username = document.querySelector("[attr-e2e='user_menu_user'] strong")?.textContent.trim();
-                const email = document.querySelector('[attr-e2e="user_menu_user"] .user-data span')?.textContent.trim();
+                const username = document.querySelector('#fndi-left-nav fis-fc-avatar')?.shadowRoot?.querySelector('.username')?.textContent.trim();
 
                 const REFRESH = 100;
                 const TIMEOUT = 300000;
@@ -71,7 +70,7 @@ async function start() {
                     for (const item of assignedToMenuItems) {
                         const title = item.getAttribute("title") || item.textContent.trim();
 
-                        if (title.toLowerCase().includes(email.toLowerCase())) {
+                        if (title.toLowerCase().includes(username.toLowerCase())) {
                             item.click();
                             break;
                         }
