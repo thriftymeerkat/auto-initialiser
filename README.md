@@ -73,4 +73,4 @@ The script is triggered by two buttons in the extension popup:
 
 ## Live Preview
 
-- Live Preview: https://mjcw88.github.io/auto-initialiser/
+- Live Preview: https://thriftymeerkat.github.io/auto-initialiser/
